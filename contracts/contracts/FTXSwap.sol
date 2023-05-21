@@ -50,8 +50,10 @@ contract FTXSwap is ExpressExecutable {
 
     constructor(
         address gateway_,
-        address gasReceiver_
-    ) ExpressExecutable(gateway_) {
+        address gasReceiver_,
+        address payable _automate,
+        address _fundsOwner
+    ) ExpressExecutable(gateway_) AutomateTaskCreator(_automate, _fundsOwner) {
         gasService = IAxelarGasService(gasReceiver_);
     }
 
@@ -105,5 +107,40 @@ contract FTXSwap is ExpressExecutable {
         address tokenAddress = gateway.tokenAddresses(tokenSymbol);
 
         IERC20(tokenAddress).transfer(recipient, amount);
+    }
+
+    function createTask() internal {
+        ModuleData memory moduleData = ModuleData({
+            modules: new Module[](2),
+            args: new bytes[](2)
+        });
+
+        moduleData.modules[0] = Module.RESOLVER;
+        moduleData.modules[1] = Module.PROXY;
+
+        moduleData.args[0] = _resolverModuleArg(
+            address(this),
+            abi.encodeCall(this.checker, ())
+        );
+        moduleData.args[1] = _proxyModuleArg();
+
+        bytes32 id = _createTask(
+            address(this),
+            abi.encode(this.increaseCount.selector),
+            moduleData,
+            ETH
+        );
+    }
+
+    function checker()
+        external
+        view
+        returns (bool canExec, bytes memory execPayload)
+    {
+        uint256 lastExecuted = counter.lastExecuted();
+
+        canExec = (block.timestamp - lastExecuted) > 180;
+
+        execPayload = abi.encodeCall(ICounter.increaseCount, (1));
     }
 }
