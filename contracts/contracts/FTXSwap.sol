@@ -35,17 +35,6 @@ import "./interfaces/Gelato/AutomateTaskCreator.sol";
 // Owner restrictions
 
 contract FTXSwap is ExpressExecutable {
-    // Interface axelar;
-    // constructor(address axelar) {
-    //     axelar = Interface(axelar);
-    // }
-    // function _callContractWithToken() internal {
-    //     axelar.callContractWithToken()
-    // }
-    //@note
-    // function swap() external {
-    // }
-
     IAxelarGasService public immutable gasService;
 
     constructor(
@@ -57,21 +46,40 @@ contract FTXSwap is ExpressExecutable {
         gasService = IAxelarGasService(gasReceiver_);
     }
 
-    function _swap() external payable {
+    /*///////////////////////////////////////////////////////////////
+                            Origin Chain Functions
+    //////////////////////////////////////////////////////////////*/
+
+    function Swap() external payable {
         _callContractWithToken();
     }
+
+    function LimitSwap() external payable {}
+
+    /*///////////////////////////////////////////////////////////////
+                            Destination Chain functions
+    //////////////////////////////////////////////////////////////*/
+
+    function executeSwap() external {}
+
+    function exectueLimitSwap() external {}
+
+    function executeGelatoTask() external {}
+
+    /*///////////////////////////////////////////////////////////////
+                           Axelar executions
+    //////////////////////////////////////////////////////////////*/
 
     function _callContractWithToken(
         string memory destinationChain,
         string memory destinationAddress,
-        address[] calldata destinationAddresses,
+        bytes memory payload,
         string memory symbol,
         uint256 amount
     ) external payable {
         address tokenAddress = gateway.tokenAddresses(symbol);
         IERC20(tokenAddress).transferFrom(msg.sender, address(this), amount);
         IERC20(tokenAddress).approve(address(gateway), amount);
-        bytes memory payload = abi.encode(destinationAddresses);
         if (msg.value > 0) {
             gasService.payNativeGasForExpressCallWithToken{value: msg.value}(
                 address(this),
@@ -92,6 +100,7 @@ contract FTXSwap is ExpressExecutable {
         );
     }
 
+    // Called by the Axelar Gating contracts
     function _executeWithToken(
         string calldata,
         string calldata,
@@ -109,6 +118,11 @@ contract FTXSwap is ExpressExecutable {
         IERC20(tokenAddress).transfer(recipient, amount);
     }
 
+    /*///////////////////////////////////////////////////////////////
+                           Gelato executions
+    //////////////////////////////////////////////////////////////*/
+
+    // we might need to pass extra args to create and store the TaskId
     function createTask() internal {
         ModuleData memory moduleData = ModuleData({
             modules: new Module[](2),
@@ -118,6 +132,7 @@ contract FTXSwap is ExpressExecutable {
         moduleData.modules[0] = Module.RESOLVER;
         moduleData.modules[1] = Module.PROXY;
 
+        // we can pass any arg we want in the encodeCall
         moduleData.args[0] = _resolverModuleArg(
             address(this),
             abi.encodeCall(this.checker, ())
@@ -126,12 +141,14 @@ contract FTXSwap is ExpressExecutable {
 
         bytes32 id = _createTask(
             address(this),
-            abi.encode(this.increaseCount.selector),
+            abi.encode(this.executeGelatoTask.selector),
             moduleData,
             ETH
         );
+        /// Here we just pass the function selector we are looking to execute
     }
 
+    // Prepare the right payload with the proper inputs for executing the limitSwap
     function checker()
         external
         view
@@ -141,6 +158,6 @@ contract FTXSwap is ExpressExecutable {
 
         canExec = (block.timestamp - lastExecuted) > 180;
 
-        execPayload = abi.encodeCall(ICounter.increaseCount, (1));
+        execPayload = abi.encodeCall(this.executeGelatoTask, ());
     }
 }
