@@ -15,8 +15,8 @@ abstract contract AutomateReady {
     address public immutable dedicatedMsgSender;
     address private immutable _gelato;
     address internal constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-    // address private constant OPS_PROXY_FACTORY =
-    //     0xC815dB16D4be6ddf2685C201937905aBf338F5D7;
+    address private constant OPS_PROXY_FACTORY =
+        0xC815dB16D4be6ddf2685C201937905aBf338F5D7;
 
     /**
      * @dev

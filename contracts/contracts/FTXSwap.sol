@@ -40,10 +40,11 @@ import "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
 // change the External Contract Addresses like Axelar , Exchange and Gelato Relayer
 // Owner restrictions
 
-contract FTXSwap is ExpressExecutable {
+contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
     IAxelarGasService public immutable gasService;
     ISwapRouter public immutable swapRouter;
     uint24 public constant poolFee = 3000;
+    address public immutable gateway;
 
     constructor(
         address gateway_,
@@ -53,6 +54,7 @@ contract FTXSwap is ExpressExecutable {
         address _swapRouter
     ) ExpressExecutable(gateway_) AutomateTaskCreator(_automate, _fundsOwner) {
         gasService = IAxelarGasService(gasReceiver_);
+        gateway = gateway_;
         swapRouter = ISwapRouter(_swapRouter);
     }
 
@@ -60,17 +62,52 @@ contract FTXSwap is ExpressExecutable {
                             Origin Chain Functions
     //////////////////////////////////////////////////////////////*/
 
-    function Swap() external payable {
-        _callContractWithToken();
+    function SwapOnUniswap(
+        string memory destinationChain,
+        string memory destinationAddress,
+        address tokenIn,
+        address tokenOut,
+        uint amountIn,
+        string memory symbol
+    ) external payable {
+        // /// take the token from the user and transfer it to this contract
+        // TransferHelper.safeTransferFrom(tokenIn, address(this), amountIn);
+        // /// then approve it for the axelar gateway contract
+        // TransferHelper.safeApprove(tokenIn, gateway, amountIn);
+
+        // prepare the payload and send the call
+        bytes memory payload = abi.encode(
+            tokenIn,
+            tokenOut,
+            msg.sender,
+            amountIn
+        );
+        _callContractWithToken(
+            destinationChain,
+            destinationAddress,
+            payload,
+            symbol,
+            amountIn
+        );
     }
 
-    function LimitSwap() external payable {}
+    function LimitSwapOnUniswap() external payable {}
 
     /*///////////////////////////////////////////////////////////////
                             Destination Chain functions
     //////////////////////////////////////////////////////////////*/
 
-    function executeSwap() external {}
+    // Executing the Swap on Uniswap
+    function executeSwap(
+        address tokenIn,
+        address tokenOut,
+        address recepient,
+        uint256 amountIn
+    ) external {
+        // this contract has the tokenIn with the amountIn
+        // also check what token you received , not the wrapped axelar ones
+        _swapUniswapSingle(tokenIn, tokenOut, recepient, amountIn);
+    }
 
     function exectueLimitSwap() external {}
 
@@ -118,16 +155,24 @@ contract FTXSwap is ExpressExecutable {
         string calldata tokenSymbol,
         uint256 amount
     ) internal override {
-        address[] memory recipients = abi.decode(payload, (address[]));
-
-        address recipient = abi.decode(payload, (address));
-
+        (
+            address tokenIn,
+            address tokenOut,
+            address recepient,
+            uint amountIn
+        ) = abi.decode(payload, (address, address, address, uint));
         address tokenAddress = gateway.tokenAddresses(tokenSymbol);
+
+        executeSwap(tokenIn, tokenOut, recepient, amountIn);
     }
 
     /*///////////////////////////////////////////////////////////////
                            Gelato executions
     //////////////////////////////////////////////////////////////*/
+
+    function depositForFees() external payable {
+        _depositFunds(msg.value, ETH);
+    }
 
     // we might need to pass extra args to create and store the TaskId
     function createTask() internal {
@@ -156,6 +201,7 @@ contract FTXSwap is ExpressExecutable {
     }
 
     // the args will be decided on the basis of the web3 function we create and the task we add
+    // @note - not ready to use , as we need to use a differnt Automate Contract for that
     function createFunctionTask(
         string memory _web3FunctionHash,
         bytes calldata _web3FunctionArgsHex
@@ -206,7 +252,7 @@ contract FTXSwap is ExpressExecutable {
         address recepient,
         uint256 amountIn
     ) internal {
-        // Approve the router to spend DAI.
+        // Approve the router to spend the token
         TransferHelper.safeApprove(tokenIn, address(swapRouter), amountIn);
 
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
