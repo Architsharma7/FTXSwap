@@ -32,6 +32,8 @@ import {IAxelarGasService} from "@axelar-network/axelar-gmp-sdk-solidity/contrac
 // change the External Contract Addresses like Axelar , Exchange and Gelato Relayer
 // Owner restrictions
 
+//@dev : link for interfaces https://github.com/axelarnetwork/axelar-gmp-sdk-solidity/tree/main/contracts/interfaces
+
 contract FTXSwap is ExpressExecutable {
     // Interface axelar;
     // constructor(address axelar) {
@@ -51,10 +53,6 @@ contract FTXSwap is ExpressExecutable {
         address gasReceiver_
     ) ExpressExecutable(gateway_) {
         gasService = IAxelarGasService(gasReceiver_);
-    }
-
-    function _swap() external payable {
-        _callContractWithToken();
     }
 
     function _callContractWithToken(
@@ -79,6 +77,7 @@ contract FTXSwap is ExpressExecutable {
                 msg.sender
             );
         }
+
         gateway.callContractWithToken(
             destinationChain,
             destinationAddress,
@@ -87,6 +86,11 @@ contract FTXSwap is ExpressExecutable {
             amount
         );
     }
+
+    function _swap() internal payable {
+        _callContractWithToken();
+    }
+
 
     function _executeWithToken(
         string calldata,
@@ -105,3 +109,26 @@ contract FTXSwap is ExpressExecutable {
         IERC20(tokenAddress).transfer(recipient, amount);
     }
 }
+
+/* Alternative methods to pay gas fees */
+//This method accepts the native tokens of the source chain.
+        // function payNativeGasForContractCallWithToken(
+        //   address sender,
+        //   string calldata destinationChain,
+        //   string calldata destinationAddress,
+        //   bytes calldata payload,
+        //   address refundAddress
+        // ) 
+
+        //This method receives any tokens for the relayer fee.
+//         function payGasForContractCallWithToken(
+//     address sender,
+//     string calldata destinationChain,
+//     string calldata destinationAddress,
+//     bytes calldata payload,
+//     string calldata symbol,
+//     uint256 amount,
+//     address gasToken,
+//     uint256 gasFeeAmount,
+//     address refundAddress
+// )
