@@ -83,4 +83,11 @@ abstract contract AutomateTaskCreator is AutomateReady {
     function _singleExecModuleArg() internal pure returns (bytes memory) {
         return bytes("");
     }
+
+    function _web3FunctionModuleArg(
+        string memory _web3FunctionHash,
+        bytes calldata _web3FunctionArgsHex
+    ) internal pure returns (bytes memory) {
+        return abi.encode(_web3FunctionHash, _web3FunctionArgsHex);
+    }
 }

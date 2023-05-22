@@ -5,7 +5,8 @@ enum Module {
     RESOLVER,
     TIME,
     PROXY,
-    SINGLE_EXEC
+    SINGLE_EXEC,
+    WEB3_FUNCTION
 }
 
 struct ModuleData {

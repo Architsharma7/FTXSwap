@@ -119,13 +119,10 @@ contract FTXSwap is ExpressExecutable {
         uint256 amount
     ) internal override {
         address[] memory recipients = abi.decode(payload, (address[]));
-        address tokenAddress = gateway.tokenAddresses(tokenSymbol);
 
         address recipient = abi.decode(payload, (address));
 
         address tokenAddress = gateway.tokenAddresses(tokenSymbol);
-
-        IERC20(tokenAddress).transfer(recipient, amount);
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -153,7 +150,35 @@ contract FTXSwap is ExpressExecutable {
             address(this),
             abi.encode(this.executeGelatoTask.selector),
             moduleData,
-            ETH
+            address(0)
+        );
+        /// Here we just pass the function selector we are looking to execute
+    }
+
+    // the args will be decided on the basis of the web3 function we create and the task we add
+    function createFunctionTask(
+        string memory _web3FunctionHash,
+        bytes calldata _web3FunctionArgsHex
+    ) internal {
+        ModuleData memory moduleData = ModuleData({
+            modules: new Module[](2),
+            args: new bytes[](2)
+        });
+
+        moduleData.modules[0] = Module.PROXY;
+        moduleData.modules[1] = Module.WEB3_FUNCTION;
+
+        moduleData.args[0] = _proxyModuleArg();
+        moduleData.args[1] = _web3FunctionModuleArg(
+            _web3FunctionHash,
+            _web3FunctionArgsHex
+        );
+
+        bytes32 id = _createTask(
+            address(this),
+            abi.encode(this.executeGelatoTask.selector),
+            moduleData,
+            address(0)
         );
         /// Here we just pass the function selector we are looking to execute
     }
