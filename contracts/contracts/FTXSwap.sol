@@ -138,6 +138,7 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
                 msg.sender
             );
         }
+
         gateway.callContractWithToken(
             destinationChain,
             destinationAddress,
@@ -312,3 +313,26 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
         ) = quoter.quoteExactInput(path, amountIn);
     }
 }
+
+/* Alternative methods to pay gas fees */
+//This method accepts the native tokens of the source chain.
+// function payNativeGasForContractCallWithToken(
+//   address sender,
+//   string calldata destinationChain,
+//   string calldata destinationAddress,
+//   bytes calldata payload,
+//   address refundAddress
+// )
+
+//This method receives any tokens for the relayer fee.
+//         function payGasForContractCallWithToken(
+//     address sender,
+//     string calldata destinationChain,
+//     string calldata destinationAddress,
+//     bytes calldata payload,
+//     string calldata symbol,
+//     uint256 amount,
+//     address gasToken,
+//     uint256 gasFeeAmount,
+//     address refundAddress
+// )
