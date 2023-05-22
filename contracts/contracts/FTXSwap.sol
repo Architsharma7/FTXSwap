@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
+pragma abicoder v2;
+
 import {AxelarExecutable} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/executable/AxelarExecutable.sol";
 import {ExpressExecutable} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/express/ExpressExecutable.sol";
 import {IAxelarGateway} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/interfaces/IAxelarGateway.sol";
@@ -7,6 +9,10 @@ import {IERC20} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/interfac
 import {IAxelarGasService} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/interfaces/IAxelarGasService.sol";
 
 import "./interfaces/Gelato/AutomateTaskCreator.sol";
+
+import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "@uniswap/v3-periphery/contracts/interfaces/IQuoterV2.sol";
+import "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
 
 // Task
 /** */
@@ -36,14 +42,18 @@ import "./interfaces/Gelato/AutomateTaskCreator.sol";
 
 contract FTXSwap is ExpressExecutable {
     IAxelarGasService public immutable gasService;
+    ISwapRouter public immutable swapRouter;
+    uint24 public constant poolFee = 3000;
 
     constructor(
         address gateway_,
         address gasReceiver_,
         address payable _automate,
-        address _fundsOwner
+        address _fundsOwner,
+        address _swapRouter
     ) ExpressExecutable(gateway_) AutomateTaskCreator(_automate, _fundsOwner) {
         gasService = IAxelarGasService(gasReceiver_);
+        swapRouter = ISwapRouter(_swapRouter);
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -159,5 +169,75 @@ contract FTXSwap is ExpressExecutable {
         canExec = (block.timestamp - lastExecuted) > 180;
 
         execPayload = abi.encodeCall(this.executeGelatoTask, ());
+    }
+
+    /*///////////////////////////////////////////////////////////////
+                           Uniswap functions
+    //////////////////////////////////////////////////////////////*/
+
+    function _swapUniswapSingle(
+        address tokenIn,
+        address tokenOut,
+        address recepient,
+        uint256 amountIn
+    ) internal {
+        // Approve the router to spend DAI.
+        TransferHelper.safeApprove(tokenIn, address(swapRouter), amountIn);
+
+        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
+            .ExactInputSingleParams({
+                tokenIn: tokenIn,
+                tokenOut: tokenOut,
+                fee: poolFee,
+                recipient: recepient,
+                deadline: block.timestamp,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            });
+
+        // The call to `exactInputSingle` executes the swap.
+        amountOut = swapRouter.exactInputSingle(params);
+    }
+
+    function _swapUniswapMulti(
+        bytes path,
+        address recepient,
+        uint256 amountIn
+    ) internal returns (uint amountOut) {
+        // Approve the router to spend DAI.
+        TransferHelper.safeApprove(tokenIn, address(swapRouter), amountIn);
+        // path: abi.encodePacked(DAI, poolFee, USDC, poolFee, WETH9),
+        ISwapRouter.ExactInputParams memory params = ISwapRouter
+            .ExactInputParams({
+                path: path,
+                recipient: recepient,
+                deadline: block.timestamp,
+                amountIn: amountIn,
+                amountOutMinimum: 0
+            });
+
+        // Executes the swap.
+        amountOut = swapRouter.exactInput(params);
+    }
+
+    function _quoteSwapMulti(
+        bytes path,
+        uint256 amountIn
+    )
+        internal
+        returns (
+            uint256 amountOut,
+            uint160[] sqrtPriceX96AfterList,
+            uint32[] initializedTicksCrossedList,
+            uint256 gasEstimate
+        )
+    {
+        (
+            amountOut,
+            sqrtPriceX96AfterList,
+            initializedTicksCrossedList,
+            gasEstimate
+        ) = quoter.quoteExactInput(path, amountIn);
     }
 }
