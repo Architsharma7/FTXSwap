@@ -27,6 +27,11 @@ import {
 import { ethers } from "ethers";
 import { getContract } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
+import {
+  AxelarQueryAPI,
+  CHAINS,
+  Environment,
+} from "@axelar-network/axelarjs-sdk";
 
 const Swapmodal = () => {
   const [originChain, setOriginChain] = useState("Ethereum");
@@ -117,14 +122,23 @@ const Swapmodal = () => {
     setDestTokenAddress(tokenAddressesDest[index].address);
   };
 
-  const provider = usePublicClient();
-  const { data: walletClient } = useWalletClient();
-
-  const FTXSwapContract = getContract({
-    // address: ,
-    // abi: ,
-    signerOrProvider: walletClient || provider,
+  const sdk = new AxelarQueryAPI({
+    environment: "testnet",
   });
+
+  const getGasFees = async() => {
+    const fees = await sdk.estimateGasFee('ethereum-2', 'Polygon' , 'WETH', 700000)
+    console.log(fees);
+  }
+
+  //   const provider = usePublicClient();
+  //   const { data: walletClient } = useWalletClient();
+
+  //   const FTXSwapContract = getContract({
+  //     // address: ,
+  //     // abi: ,
+  //     signerOrProvider: walletClient || provider,
+  //   });
 
   // const provider = new ethers.JsonRpcProvider(url)
   // const signer = provider.getSigner()
@@ -133,40 +147,40 @@ const Swapmodal = () => {
 
   // const contract = new ethers.Contract(address, abi, provider)
 
-  const swapOnUniswap = async () => {
-    try {
-      const tx = await FTXSwapContract.SwapOnUniswap(
-        finalChain,
-        "",
-        "",
-        "",
-        inputValueOC,
-        originToken.name
-      );
-      await tx.wait();
-      console.log(tx);
-    } catch (error) {
-        console.log(error)
-    }
-  };
+  //   const swapOnUniswap = async () => {
+  //     try {
+  //       const tx = await FTXSwapContract.SwapOnUniswap(
+  //         finalChain,
+  //         "",
+  //         "",
+  //         "",
+  //         inputValueOC,
+  //         originToken.name
+  //       );
+  //       await tx.wait();
+  //       console.log(tx);
+  //     } catch (error) {
+  //         console.log(error)
+  //     }
+  //   };
 
-  const swapOnUniswapWithLimit = async() => {
-    try {
-        const tx = await FTXSwapContract.LimitSwapOnUniswap(
-          finalChain,
-          "",
-          "",
-          "",
-          "",
-          inputValueOC,
-          originToken.name
-        );
-        await tx.wait();
-        console.log(tx);
-      } catch (error) {
-          console.log(error)
-      }
-  };
+  //   const swapOnUniswapWithLimit = async() => {
+  //     try {
+  //         const tx = await FTXSwapContract.LimitSwapOnUniswap(
+  //           finalChain,
+  //           "",
+  //           "",
+  //           "",
+  //           "",
+  //           inputValueOC,
+  //           originToken.name
+  //         );
+  //         await tx.wait();
+  //         console.log(tx);
+  //       } catch (error) {
+  //           console.log(error)
+  //       }
+  //   };
   return (
     <div className="w-screen mt-12">
       <div className="flex justify-center items-center mx-auto">
@@ -671,6 +685,7 @@ const Swapmodal = () => {
                   <div className="mt-4 flex justify-center">
                     {isConnected ? (
                       <button
+                      onClick={getGasFees()}
                         disabled={inputValueOC == "" ? true : false}
                         className={`flex justify-center items-center mx-auto bg-indigo-700 w-full rounded-xl px-3 py-3 text-xl text-white ${
                           inputValueOC == ""

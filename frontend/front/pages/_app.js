@@ -7,8 +7,6 @@ import { mainnet, polygon, arbitrum, filecoin } from "wagmi/chains";
 import { alchemyProvider } from "wagmi/providers/alchemy";
 import { publicProvider } from "wagmi/providers/public";
 import { ChakraProvider } from "@chakra-ui/react";
-import { createClient} from "wagmi";
-import { jsonRpcProvider } from "wagmi/providers/jsonRpc";
 
 const { chains, publicClient } = configureChains(
   [mainnet, polygon, filecoin, arbitrum],
