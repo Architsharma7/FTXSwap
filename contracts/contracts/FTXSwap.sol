@@ -115,6 +115,7 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
         _callContractWithToken(
             destinationChain,
             destinationAddress,
+            msg.sender,
             payload,
             symbol,
             amountIn
@@ -152,6 +153,7 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
         _callContractWithToken(
             destinationChain,
             destinationAddress,
+            msg.sender,
             payload,
             symbol,
             amountIn
@@ -198,7 +200,7 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
         createTask(limitOrderId);
     }
 
-    function executeGelatoTask(uint orderId) public {
+    function executeGelatoTask(uint orderId) public onlyDedicatedMsgSender {
         LimitOrder memory _limitOrder = limitOrders[orderId];
 
         require(!_limitOrder.executed, "Order already executed");
@@ -241,13 +243,14 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
     function _callContractWithToken(
         string memory destinationChain,
         string memory destinationAddress,
+        address recepient,
         bytes memory payload,
         string memory symbol,
         uint256 amount
     ) internal {
         address tokenAddress = gateway.tokenAddresses(symbol);
         // IERC20(tokenAddress).transferFrom(msg.sender, address(this), amount);
-        TransferHelper.safeTransferFrom(tokenAddress, msg.sender , address(this), amount);
+        TransferHelper.safeTransferFrom(tokenAddress, recepient , address(this), amount);
         // IERC20(tokenAddress).approve(address(gateway), amount);
         TransferHelper.safeApprove(tokenAddress, address(gateway), amount);
         gateway.callContractWithToken(
@@ -275,7 +278,7 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
             uint limitPrice
         ) = abi.decode(payload, (address, address, address, uint, uint));
         address tokenAddress = gateway.tokenAddresses(tokenSymbol);
-
+        require(amountIn == amount, "Sent amount not correct");
         if (limitPrice!= 0) {
             exectueLimitSwap(
                 tokenIn,
@@ -300,12 +303,14 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
     // we might need to pass extra args to create and store the TaskId
     function createTask(uint orderId) internal {
         ModuleData memory moduleData = ModuleData({
-            modules: new Module[](2),
-            args: new bytes[](2)
+            modules: new Module[](3),
+            args: new bytes[](3)
         });
 
         moduleData.modules[0] = Module.RESOLVER;
         moduleData.modules[1] = Module.PROXY;
+        moduleData.modules[2] = Module.SINGLE_EXEC;
+
 
         // we can pass any arg we want in the encodeCall
         moduleData.args[0] = _resolverModuleArg(
@@ -313,6 +318,7 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
             abi.encodeCall(this.checker, (orderId))
         );
         moduleData.args[1] = _proxyModuleArg();
+        moduleData.args[2] = _singleExecModuleArg();
 
         bytes32 taskId = _createTask(
             address(this),

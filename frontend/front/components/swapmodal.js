@@ -150,7 +150,7 @@ const Swapmodal = () => {
                             // ref={menuRef}
                             className="flex justify-center text-white flex-col absolute bg-gray-700 rounded-xl mt-1"
                           >
-                            {OriginChain.map((ochain) => {
+                            {OriginChain.map((ochain, index) => {
                               return (
                                 <li
                                   className="py-2 px-8 rounded-xl hover:bg-gray-800 cursor-pointer"
