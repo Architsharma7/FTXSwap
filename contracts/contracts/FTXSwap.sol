@@ -5,7 +5,7 @@ pragma abicoder v2;
 import {AxelarExecutable} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/executable/AxelarExecutable.sol";
 import {ExpressExecutable} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/express/ExpressExecutable.sol";
 import {IAxelarGateway} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/interfaces/IAxelarGateway.sol";
-import {IERC20} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/interfaces/IERC20.sol";
+// import {IERC20} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/interfaces/IERC20.sol";
 import {IAxelarGasService} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/interfaces/IAxelarGasService.sol";
 
 import "./interfaces/Gelato/AutomateTaskCreator.sol";
@@ -45,7 +45,8 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
     ISwapRouter public immutable swapRouter;
     IQuoterV2 public immutable quoter;
     uint24 public constant poolFee = 3000;
-    address public immutable gateway;
+    uint160 sqrtPriceLimitX96 = 0;
+    // address public immutable gatewayAddress;
 
     struct LimitOrder {
         address tokenIn;
@@ -53,8 +54,6 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
         uint amountIn;
         uint limitPrice;
         address recepient;
-        string sourceChain;
-        string sourceAddress;
         bytes32 taskId;
         bool executed;
     }
@@ -73,7 +72,6 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
         address _quoterv2
     ) ExpressExecutable(gateway_) AutomateTaskCreator(_automate, _fundsOwner) {
         gasService = IAxelarGasService(gasReceiver_);
-        gateway = gateway_;
         swapRouter = ISwapRouter(_swapRouter);
         quoter = IQuoterV2(_quoterv2);
     }
@@ -103,7 +101,18 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
             msg.sender,
             amountIn
         );
-        _callContractWithToken{value: msg.value}(
+        if (msg.value > 0) {
+            gasService.payNativeGasForExpressCallWithToken{value: msg.value}(
+                address(this),
+                destinationChain,
+                destinationAddress,
+                payload,
+                symbol,
+                amountIn,
+                msg.sender
+            );
+        }
+        _callContractWithToken(
             destinationChain,
             destinationAddress,
             payload,
@@ -129,7 +138,18 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
             amountIn,
             limitPrice
         );
-        _callContractWithToken{value: msg.value}(
+        if (msg.value > 0) {
+            gasService.payNativeGasForExpressCallWithToken{value: msg.value}(
+                address(this),
+                destinationChain,
+                destinationAddress,
+                payload,
+                symbol,
+                amountIn,
+                msg.sender
+            );
+        }
+        _callContractWithToken(
             destinationChain,
             destinationAddress,
             payload,
@@ -159,9 +179,7 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
         address tokenOut,
         address recepient,
         uint256 amountIn,
-        uint256 limitPrice,
-        string memory sourceChain,
-        string memory sourceAddress
+        uint256 limitPrice
     ) internal {
         /// store the limit order Info
         limitOrderCounter += 1;
@@ -172,8 +190,6 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
             amountIn,
             limitPrice,
             recepient,
-            sourceChain,
-            sourceAddress,
             0,
             false
         );
@@ -182,13 +198,13 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
         createTask(limitOrderId);
     }
 
-    function executeGelatoTask(uint orderId) internal {
+    function executeGelatoTask(uint orderId) public {
         LimitOrder memory _limitOrder = limitOrders[orderId];
 
         require(!_limitOrder.executed, "Order already executed");
 
         _swapUniswapSingle(
-            _limitOrder.tokenIns,
+            _limitOrder.tokenIn,
             _limitOrder.tokenOut,
             _limitOrder.recepient,
             _limitOrder.amountIn
@@ -198,9 +214,9 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
     // Prepare the right payload with the proper inputs for executing the limitSwap
     function checker(
         uint orderId
-    ) external view returns (bool canExec, bytes memory execPayload) {
+    ) external  returns (bool canExec, bytes memory execPayload) {
         LimitOrder memory _limitOrder = limitOrders[orderId];
-        // uint amountPrice = 1 ether;
+        uint amountPrice = 1 ether;
 
         /// fetching the price for 1
         (uint256 amountOut, , , ) = _quoteSwapSingle(
@@ -209,7 +225,7 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
             amountPrice
         );
 
-        canExec = (amountOut == limitPrice) ? true : false;
+        canExec = (amountOut == _limitOrder.limitPrice) ? true : false;
         if (canExec) {
             execPayload = abi.encodeCall(this.executeGelatoTask, (orderId));
         } else {
@@ -228,21 +244,12 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
         bytes memory payload,
         string memory symbol,
         uint256 amount
-    ) public payable {
+    ) internal {
         address tokenAddress = gateway.tokenAddresses(symbol);
-        IERC20(tokenAddress).transferFrom(msg.sender, address(this), amount);
-        IERC20(tokenAddress).approve(address(gateway), amount);
-        if (msg.value > 0) {
-            gasService.payNativeGasForExpressCallWithToken{value: msg.value}(
-                address(this),
-                destinationChain,
-                destinationAddress,
-                payload,
-                symbol,
-                amount,
-                msg.sender
-            );
-        }
+        // IERC20(tokenAddress).transferFrom(msg.sender, address(this), amount);
+        TransferHelper.safeTransferFrom(tokenAddress, msg.sender , address(this), amount);
+        // IERC20(tokenAddress).approve(address(gateway), amount);
+        TransferHelper.safeApprove(tokenAddress, address(gateway), amount);
         gateway.callContractWithToken(
             destinationChain,
             destinationAddress,
@@ -254,10 +261,10 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
 
     // Called by the Axelar Gating contracts
     function _executeWithToken(
-        string memory sourceChain,
-        string memory sourceAddress,
+        string calldata sourceChain,
+        string calldata sourceAddress,
         bytes calldata payload,
-        string memory tokenSymbol,
+        string calldata tokenSymbol,
         uint256 amount
     ) internal override {
         (
@@ -269,15 +276,13 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
         ) = abi.decode(payload, (address, address, address, uint, uint));
         address tokenAddress = gateway.tokenAddresses(tokenSymbol);
 
-        if (limitPrice) {
+        if (limitPrice!= 0) {
             exectueLimitSwap(
                 tokenIn,
                 tokenOut,
                 recepient,
-                amoutnIn,
-                limitPrice,
-                sourceChain,
-                sourceAddress
+                amountIn,
+                limitPrice
             );
         } else {
             executeSwap(tokenIn, tokenOut, recepient, amountIn);
@@ -361,7 +366,7 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
         address tokenOut,
         address recepient,
         uint256 amountIn
-    ) internal {
+    ) internal returns(uint amountOut) {
         // Approve the router to spend the token
         TransferHelper.safeApprove(tokenIn, address(swapRouter), amountIn);
 
@@ -382,12 +387,12 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
     }
 
     function _swapUniswapMulti(
-        bytes path,
+        bytes memory path,
         address recepient,
         uint256 amountIn
     ) internal returns (uint amountOut) {
         // Approve the router to spend DAI.
-        TransferHelper.safeApprove(tokenIn, address(swapRouter), amountIn);
+        // TransferHelper.safeApprove(tokenIn, address(swapRouter), amountIn);
         // path: abi.encodePacked(DAI, poolFee, USDC, poolFee, WETH9),
         ISwapRouter.ExactInputParams memory params = ISwapRouter
             .ExactInputParams({
@@ -403,14 +408,14 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
     }
 
     function _quoteSwapMulti(
-        bytes path,
+        bytes memory path,
         uint256 amountIn
     )
         internal
         returns (
             uint256 amountOut,
-            uint160[] sqrtPriceX96AfterList,
-            uint32[] initializedTicksCrossedList,
+            uint160[] memory sqrtPriceX96AfterList,
+            uint32[] memory initializedTicksCrossedList,
             uint256 gasEstimate
         )
     {
@@ -430,23 +435,26 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
         internal
         returns (
             uint256 amountOut,
-            uint160[] sqrtPriceX96AfterList,
-            uint32[] initializedTicksCrossedList,
+            uint160 sqrtPriceX96After,
+            uint32 initializedTicksCrossed,
             uint256 gasEstimate
         )
     {
+
+        IQuoterV2.QuoteExactInputSingleParams memory params = IQuoterV2.QuoteExactInputSingleParams({
+            tokenIn: tokenIn,
+            tokenOut: tokenOut,
+            amountIn: amountIn,
+            fee: poolFee,
+            sqrtPriceLimitX96: sqrtPriceLimitX96
+        });
+        
         (
             amountOut,
-            sqrtPriceX96AfterList,
-            initializedTicksCrossedList,
+            sqrtPriceX96After,
+            initializedTicksCrossed,
             gasEstimate
-        ) = quoter.quoteExactInputSingle(
-            tokenIn,
-            tokenOut,
-            amountIn,
-            poolFee,
-            0
-        );
+        ) = quoter.quoteExactInputSingle(params);
     }
 }
 

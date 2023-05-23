@@ -42,7 +42,7 @@ abstract contract AutomateReady {
         // address opsProxyFactoryAddress = IProxyModule(proxyModuleAddress)
         //     .opsProxyFactory();
 
-        (dedicatedMsgSender, ) = IOpsProxyFactory(opsProxyFactoryAddress)
+        (dedicatedMsgSender, ) = IOpsProxyFactory(OPS_PROXY_FACTORY)
             .getProxyOf(_taskCreator);
     }
 
