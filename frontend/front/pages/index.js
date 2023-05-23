@@ -3,9 +3,9 @@ import Swapmodal from "../components/swapmodal";
 
 export default function Home() {
   return (
-    <div>
-      <Navbar/>
-      <Swapmodal/>
+    <div className="bg-black w-full h-full">
+      <Navbar />
+      <Swapmodal />
     </div>
-  )
+  );
 }
