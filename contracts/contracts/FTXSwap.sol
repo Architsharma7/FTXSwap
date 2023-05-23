@@ -43,19 +43,39 @@ import "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
 contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
     IAxelarGasService public immutable gasService;
     ISwapRouter public immutable swapRouter;
+    IQuoterV2 public immutable quoter;
     uint24 public constant poolFee = 3000;
     address public immutable gateway;
+
+    struct LimitOrder {
+        address tokenIn;
+        address tokenOut;
+        uint amountIn;
+        uint limitPrice;
+        address recepient;
+        string sourceChain;
+        string sourceAddress;
+        bytes32 taskId;
+        bool executed;
+    }
+
+    uint public limitOrderCounter;
+    mapping(uint => LimitOrder) public limitOrders;
+
+    event limitOrderTaskCreated(uint orderId, bytes32 taskId);
 
     constructor(
         address gateway_,
         address gasReceiver_,
         address payable _automate,
         address _fundsOwner,
-        address _swapRouter
+        address _swapRouter,
+        address _quoterv2
     ) ExpressExecutable(gateway_) AutomateTaskCreator(_automate, _fundsOwner) {
         gasService = IAxelarGasService(gasReceiver_);
         gateway = gateway_;
         swapRouter = ISwapRouter(_swapRouter);
+        quoter = IQuoterV2(_quoterv2);
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -76,13 +96,14 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
         // TransferHelper.safeApprove(tokenIn, gateway, amountIn);
 
         // prepare the payload and send the call
+        require(msg.value > 0, "Need to pay for gas");
         bytes memory payload = abi.encode(
             tokenIn,
             tokenOut,
             msg.sender,
             amountIn
         );
-        _callContractWithToken(
+        _callContractWithToken{value: msg.value}(
             destinationChain,
             destinationAddress,
             payload,
@@ -91,7 +112,31 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
         );
     }
 
-    function LimitSwapOnUniswap() external payable {}
+    function LimitSwapOnUniswap(
+        string memory destinationChain,
+        string memory destinationAddress,
+        address tokenIn,
+        address tokenOut,
+        uint amountIn,
+        uint limitPrice,
+        string memory symbol
+    ) external payable {
+        require(msg.value > 0, "Need to pay for gas");
+        bytes memory payload = abi.encode(
+            tokenIn,
+            tokenOut,
+            msg.sender,
+            amountIn,
+            limitPrice
+        );
+        _callContractWithToken{value: msg.value}(
+            destinationChain,
+            destinationAddress,
+            payload,
+            symbol,
+            amountIn
+        );
+    }
 
     /*///////////////////////////////////////////////////////////////
                             Destination Chain functions
@@ -103,27 +148,87 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
         address tokenOut,
         address recepient,
         uint256 amountIn
-    ) external {
+    ) internal {
         // this contract has the tokenIn with the amountIn
         // also check what token you received , not the wrapped axelar ones
         _swapUniswapSingle(tokenIn, tokenOut, recepient, amountIn);
     }
 
-    function exectueLimitSwap() external {}
+    function exectueLimitSwap(
+        address tokenIn,
+        address tokenOut,
+        address recepient,
+        uint256 amountIn,
+        uint256 limitPrice,
+        string memory sourceChain,
+        string memory sourceAddress
+    ) internal {
+        /// store the limit order Info
+        limitOrderCounter += 1;
+        uint limitOrderId = limitOrderCounter;
+        limitOrders[limitOrderId] = LimitOrder(
+            tokenIn,
+            tokenOut,
+            amountIn,
+            limitPrice,
+            recepient,
+            sourceChain,
+            sourceAddress,
+            0,
+            false
+        );
+        /// create the gelato Task
 
-    function executeGelatoTask() external {}
+        createTask(limitOrderId);
+    }
+
+    function executeGelatoTask(uint orderId) internal {
+        LimitOrder memory _limitOrder = limitOrders[orderId];
+
+        require(!_limitOrder.executed, "Order already executed");
+
+        _swapUniswapSingle(
+            _limitOrder.tokenIns,
+            _limitOrder.tokenOut,
+            _limitOrder.recepient,
+            _limitOrder.amountIn
+        );
+    }
+
+    // Prepare the right payload with the proper inputs for executing the limitSwap
+    function checker(
+        uint orderId
+    ) external view returns (bool canExec, bytes memory execPayload) {
+        LimitOrder memory _limitOrder = limitOrders[orderId];
+        // uint amountPrice = 1 ether;
+
+        /// fetching the price for 1
+        (uint256 amountOut, , , ) = _quoteSwapSingle(
+            _limitOrder.tokenIn,
+            _limitOrder.tokenOut,
+            amountPrice
+        );
+
+        canExec = (amountOut == limitPrice) ? true : false;
+        if (canExec) {
+            execPayload = abi.encodeCall(this.executeGelatoTask, (orderId));
+        } else {
+            execPayload = abi.encode("Price Not matched");
+        }
+    }
 
     /*///////////////////////////////////////////////////////////////
                            Axelar executions
     //////////////////////////////////////////////////////////////*/
 
+    // send gas with this call
     function _callContractWithToken(
         string memory destinationChain,
         string memory destinationAddress,
         bytes memory payload,
         string memory symbol,
         uint256 amount
-    ) external payable {
+    ) public payable {
         address tokenAddress = gateway.tokenAddresses(symbol);
         IERC20(tokenAddress).transferFrom(msg.sender, address(this), amount);
         IERC20(tokenAddress).approve(address(gateway), amount);
@@ -138,7 +243,6 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
                 msg.sender
             );
         }
-
         gateway.callContractWithToken(
             destinationChain,
             destinationAddress,
@@ -150,21 +254,34 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
 
     // Called by the Axelar Gating contracts
     function _executeWithToken(
-        string calldata,
-        string calldata,
+        string memory sourceChain,
+        string memory sourceAddress,
         bytes calldata payload,
-        string calldata tokenSymbol,
+        string memory tokenSymbol,
         uint256 amount
     ) internal override {
         (
             address tokenIn,
             address tokenOut,
             address recepient,
-            uint amountIn
-        ) = abi.decode(payload, (address, address, address, uint));
+            uint amountIn,
+            uint limitPrice
+        ) = abi.decode(payload, (address, address, address, uint, uint));
         address tokenAddress = gateway.tokenAddresses(tokenSymbol);
 
-        executeSwap(tokenIn, tokenOut, recepient, amountIn);
+        if (limitPrice) {
+            exectueLimitSwap(
+                tokenIn,
+                tokenOut,
+                recepient,
+                amoutnIn,
+                limitPrice,
+                sourceChain,
+                sourceAddress
+            );
+        } else {
+            executeSwap(tokenIn, tokenOut, recepient, amountIn);
+        }
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -176,7 +293,7 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
     }
 
     // we might need to pass extra args to create and store the TaskId
-    function createTask() internal {
+    function createTask(uint orderId) internal {
         ModuleData memory moduleData = ModuleData({
             modules: new Module[](2),
             args: new bytes[](2)
@@ -188,17 +305,21 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
         // we can pass any arg we want in the encodeCall
         moduleData.args[0] = _resolverModuleArg(
             address(this),
-            abi.encodeCall(this.checker, ())
+            abi.encodeCall(this.checker, (orderId))
         );
         moduleData.args[1] = _proxyModuleArg();
 
-        bytes32 id = _createTask(
+        bytes32 taskId = _createTask(
             address(this),
             abi.encode(this.executeGelatoTask.selector),
             moduleData,
             address(0)
         );
+
+        limitOrders[orderId].taskId = taskId;
         /// Here we just pass the function selector we are looking to execute
+
+        emit limitOrderTaskCreated(orderId, taskId);
     }
 
     // the args will be decided on the basis of the web3 function we create and the task we add
@@ -227,20 +348,8 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
             moduleData,
             address(0)
         );
+        /// log the event with the Gelaot Task ID
         /// Here we just pass the function selector we are looking to execute
-    }
-
-    // Prepare the right payload with the proper inputs for executing the limitSwap
-    function checker()
-        external
-        view
-        returns (bool canExec, bytes memory execPayload)
-    {
-        uint256 lastExecuted = counter.lastExecuted();
-
-        canExec = (block.timestamp - lastExecuted) > 180;
-
-        execPayload = abi.encodeCall(this.executeGelatoTask, ());
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -311,6 +420,33 @@ contract FTXSwap is ExpressExecutable, AutomateTaskCreator {
             initializedTicksCrossedList,
             gasEstimate
         ) = quoter.quoteExactInput(path, amountIn);
+    }
+
+    function _quoteSwapSingle(
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn
+    )
+        internal
+        returns (
+            uint256 amountOut,
+            uint160[] sqrtPriceX96AfterList,
+            uint32[] initializedTicksCrossedList,
+            uint256 gasEstimate
+        )
+    {
+        (
+            amountOut,
+            sqrtPriceX96AfterList,
+            initializedTicksCrossedList,
+            gasEstimate
+        ) = quoter.quoteExactInputSingle(
+            tokenIn,
+            tokenOut,
+            amountIn,
+            poolFee,
+            0
+        );
     }
 }
 
