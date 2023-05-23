@@ -23,6 +23,10 @@ import {
   PolygonTokens,
   ArbitriumTokens,
 } from "../constants/tokenaddresses";
+// import { useContract, useProvider, useSigner } from "wagmi";
+import { ethers } from "ethers";
+import { getContract } from "viem";
+import { usePublicClient, useWalletClient } from "wagmi";
 
 const Swapmodal = () => {
   const [originChain, setOriginChain] = useState("Ethereum");
@@ -113,6 +117,56 @@ const Swapmodal = () => {
     setDestTokenAddress(tokenAddressesDest[index].address);
   };
 
+  const provider = usePublicClient();
+  const { data: walletClient } = useWalletClient();
+
+  const FTXSwapContract = getContract({
+    // address: ,
+    // abi: ,
+    signerOrProvider: walletClient || provider,
+  });
+
+  // const provider = new ethers.JsonRpcProvider(url)
+  // const signer = provider.getSigner()
+
+  // console.log(signer)
+
+  // const contract = new ethers.Contract(address, abi, provider)
+
+  const swapOnUniswap = async () => {
+    try {
+      const tx = await FTXSwapContract.SwapOnUniswap(
+        finalChain,
+        "",
+        "",
+        "",
+        inputValueOC,
+        originToken.name
+      );
+      await tx.wait();
+      console.log(tx);
+    } catch (error) {
+        console.log(error)
+    }
+  };
+
+  const swapOnUniswapWithLimit = async() => {
+    try {
+        const tx = await FTXSwapContract.LimitSwapOnUniswap(
+          finalChain,
+          "",
+          "",
+          "",
+          "",
+          inputValueOC,
+          originToken.name
+        );
+        await tx.wait();
+        console.log(tx);
+      } catch (error) {
+          console.log(error)
+      }
+  };
   return (
     <div className="w-screen mt-12">
       <div className="flex justify-center items-center mx-auto">
@@ -150,7 +204,7 @@ const Swapmodal = () => {
                             // ref={menuRef}
                             className="flex justify-center text-white flex-col absolute bg-gray-700 rounded-xl mt-1"
                           >
-                            {OriginChain.map((ochain) => {
+                            {OriginChain.map((ochain, index) => {
                               return (
                                 <li
                                   className="py-2 px-8 rounded-xl hover:bg-gray-800 cursor-pointer"
