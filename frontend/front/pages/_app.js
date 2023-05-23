@@ -30,9 +30,9 @@ function MyApp({ Component, pageProps }) {
   return (
     <WagmiConfig config={wagmiConfig}>
       <RainbowKitProvider chains={chains}>
-        <main className={myFont.className}>
-          <Component {...pageProps} />
-        </main>
+          <main className={myFont.className}>
+            <Component {...pageProps} />
+          </main>
       </RainbowKitProvider>
     </WagmiConfig>
   );
