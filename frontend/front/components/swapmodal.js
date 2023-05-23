@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import Modal from "react-modal";
+// import Modal from "react-modal";
 import { AiOutlineClose } from "react-icons/ai";
 import Image from "next/image";
 import eth from "../public/eth.svg";
@@ -27,29 +27,27 @@ const Swapmodal = () => {
   const [originTokenLogo, setOriginTokenLogo] = useState(usdc);
   const [originChainLogo, setoriginChainLogo] = useState(eth);
   const [finalChainLogo, setfinalChainLogo] = useState(poly);
-  const [finalTokenLogo, setfinalTokenLogo] = useState();
+  const [finalTokenLogo, setfinalTokenLogo] = useState(usdt);
   const menuRef = useRef();
   const buttonRef = useRef();
-  const [modalIsOpen, setIsOpen] = useState(false);
+
+  const [inputValueOC, setInputValueOC] = useState('')
 
   useEffect(() => {
     window.addEventListener("click", (e) => {
       if (e.target !== menuRef.current && e.target !== buttonRef.current) {
-        setOpenOC(false) &&
-          setOpenFC(false) &&
-          setOpenOT(false) &&
-          setOpenFT(false);
+        setOpenOC(false) 
       }
     });
   }, []);
 
-  function openModal() {
-    setIsOpen(true);
-  }
+//   function openModal() {
+//     setIsOpen(true);
+//   }
 
-  function closeModal() {
-    setIsOpen(false);
-  }
+//   function closeModal() {
+//     setIsOpen(false);
+//   }
 
   const selectOriginChain = (chainName, logo) => {
     setOriginChain(chainName);
@@ -90,7 +88,7 @@ const Swapmodal = () => {
                     onClick={() => setOpenOC(!openOC)}
                     ref={buttonRef}
                   >
-                    <div className="hidden rounded-full md:inline-flex h-6 w-6 2xl:h-9 2xl:w-9 text-white">
+                    <div className="rounded-full h-6 w-6 2xl:h-9 2xl:w-9 text-white">
                       <Image src={originChainLogo} alt="logo" />
                     </div>
                     <p className="text-white mx-2 2xl:text-3xl">
@@ -233,6 +231,8 @@ const Swapmodal = () => {
                 className="w-full px-4 py-2 bg-slate-900 text-3xl text-white outline-none"
                 placeholder="0"
                 disabled={isConnected ? false : true}
+                value={inputValueOC}
+                onChange={(e) => setInputValueOC(e.target.value)}
               ></input>
             </div>
             <div className="mt-3">
@@ -316,7 +316,7 @@ const Swapmodal = () => {
                     className="px-4 py-3 flex rounded-xl hover:bg-slate-700 cursor-pointer bg-slate-800"
                     onClick={() => setOpenFT(!openFT)}
                   >
-                    <div className="hidden rounded-full md:inline-flex h-6 w-6 2xl:h-9 2xl:w-9 text-white">
+                    <div className="rounded-full h-6 w-6 2xl:h-9 2xl:w-9 text-white">
                       <Image src={finalTokenLogo} alt="logo" />
                     </div>
                     <p className="text-white mx-2 2xl:text-3xl">{finalToken}</p>
@@ -389,7 +389,7 @@ const Swapmodal = () => {
             </div>
             <div className="mt-4 flex justify-center">
               {isConnected ? (
-                <button className="flex justify-center items-center mx-auto bg-indigo-700 w-full rounded-xl px-3 py-3 text-xl text-white hover:scale-105 hover:bg-white hover:text-indigo-700 duration-300">
+                <button disabled={inputValueOC == '' ? true : false} className="flex justify-center items-center mx-auto bg-indigo-700 w-full rounded-xl px-3 py-3 text-xl text-white hover:scale-105 hover:bg-white hover:text-indigo-700 duration-300">
                   Swap
                 </button>
               ) : (
