@@ -31,23 +31,23 @@ const Swapmodal = () => {
   const menuRef = useRef();
   const buttonRef = useRef();
 
-  const [inputValueOC, setInputValueOC] = useState('')
+  const [inputValueOC, setInputValueOC] = useState("");
 
   useEffect(() => {
     window.addEventListener("click", (e) => {
       if (e.target !== menuRef.current && e.target !== buttonRef.current) {
-        setOpenOC(false) 
+        setOpenOC(false);
       }
     });
   }, []);
 
-//   function openModal() {
-//     setIsOpen(true);
-//   }
+  //   function openModal() {
+  //     setIsOpen(true);
+  //   }
 
-//   function closeModal() {
-//     setIsOpen(false);
-//   }
+  //   function closeModal() {
+  //     setIsOpen(false);
+  //   }
 
   const selectOriginChain = (chainName, logo) => {
     setOriginChain(chainName);
@@ -65,13 +65,13 @@ const Swapmodal = () => {
     setFinalChain(chainName);
     console.log(chainName);
     setfinalChainLogo(logo);
-    setOpenFC(false)
+    setOpenFC(false);
   };
   const selectFinalToken = (tokenName, logo) => {
     setFinalToken(tokenName);
     console.log(tokenName);
     setfinalTokenLogo(logo);
-    setOpenFT(false)
+    setOpenFT(false);
   };
 
   return (
@@ -389,7 +389,14 @@ const Swapmodal = () => {
             </div>
             <div className="mt-4 flex justify-center">
               {isConnected ? (
-                <button disabled={inputValueOC == '' ? true : false} className="flex justify-center items-center mx-auto bg-indigo-700 w-full rounded-xl px-3 py-3 text-xl text-white hover:scale-105 hover:bg-white hover:text-indigo-700 duration-300">
+                <button
+                  disabled={inputValueOC == "" ? true : false}
+                  className={`flex justify-center items-center mx-auto bg-indigo-700 w-full rounded-xl px-3 py-3 text-xl text-white ${
+                    inputValueOC == ""
+                      ? " cursor-not-allowed"
+                      : "hover:scale-105 hover:bg-white hover:text-indigo-700 duration-300"
+                  }`}
+                >
                   Swap
                 </button>
               ) : (
