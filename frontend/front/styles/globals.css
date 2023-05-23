@@ -28,8 +28,10 @@ body{
   background-color: black;
 }
 html{
-  background-color: black
+  background: linear-gradient(90deg, rgba(55,48,163,1) 0%, rgba(88,28,135,1) 100%);
 }
+
+
 
 @tailwind base;
 @tailwind components;
