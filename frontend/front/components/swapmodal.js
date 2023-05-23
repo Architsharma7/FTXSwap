@@ -27,6 +27,10 @@ import {
 const Swapmodal = () => {
   const [originChain, setOriginChain] = useState("Ethereum");
   const [originToken, setOriginToken] = useState("USDC");
+  const [tokenAddressesOrigin, setTokenAddressesOrigin] = useState();
+  const [tokenAddressesDest, setTokenAddressesDest] = useState();
+  const [originTokenAddress, setOriginTokenAddress] = useState();
+  const [destTokenAddress, setDestTokenAddress] = useState();
   const [finalChain, setFinalChain] = useState("Polygon");
   const [finalToken, setFinalToken] = useState("USDT");
   const [openOC, setOpenOC] = useState(false);
@@ -45,38 +49,68 @@ const Swapmodal = () => {
   const buttonRef = useRef();
 
   const [inputValueOC, setInputValueOC] = useState("");
+  // console.log(originTokenAddress, destTokenAddress);
 
-//   useEffect(() => {
-//     window.addEventListener("click", (e) => {
-//       if (e.target !== menuRef.current && e.target !== buttonRef.current) {
-//         setOpenOC(false);
-//       }
-//     });
-//   }, []);
+  // useEffect(() => {
+  //   selectOriginChain(OriginChain[0].name, OriginChain[0].logo);
+  //   selectOriginToken(OriginTokens[0].name, OriginTokens[0].logo, 0);
+  // }, []);
+  const selecteOriginTokenAddresses = (chainName) => {
+    if (chainName == "Ethereum") {
+      // console.log(EthereumTokens);
+      setTokenAddressesOrigin(EthereumTokens);
+    } else if (chainName == "Filecoin") {
+      setTokenAddressesOrigin(FilecoinTokens);
+    } else if (chainName == "Polygon") {
+      setTokenAddressesOrigin(PolygonTokens);
+    } else if (chainName == "Arbitrium") {
+      setTokenAddressesOrigin(ArbitriumTokens);
+    } else {
+      console.log("Not the  Right Network");
+    }
+  };
+
+  const selectDestTokenAddresses = (chainName) => {
+    if (chainName == "Ethereum") {
+      setTokenAddressesDest(EthereumTokens);
+    } else if (chainName == "Polygon") {
+      setTokenAddressesDest(PolygonTokens);
+    } else if (chainName == "Arbitrium") {
+      setTokenAddressesDest(ArbitriumTokens);
+    } else {
+      console.log("Not the  Right Network");
+    }
+  };
 
   const selectOriginChain = (chainName, logo) => {
     setOriginChain(chainName);
     console.log(chainName);
     setoriginChainLogo(logo);
     setOpenOC(false);
+    selecteOriginTokenAddresses(chainName);
   };
-  const selectOriginToken = (tokenName, logo) => {
+  const selectOriginToken = (tokenName, logo, index) => {
     setOriginToken(tokenName);
     console.log(tokenName);
     setOriginTokenLogo(logo);
     setOpenOT(false);
+    console.log(index);
+    setOriginTokenAddress(tokenAddressesOrigin[index].address);
   };
   const selectFinalChain = (chainName, logo) => {
     setFinalChain(chainName);
     console.log(chainName);
     setfinalChainLogo(logo);
     setOpenFC(false);
+    selectDestTokenAddresses(chainName);
   };
-  const selectFinalToken = (tokenName, logo) => {
+  const selectFinalToken = (tokenName, logo, index) => {
     setFinalToken(tokenName);
     console.log(tokenName);
     setfinalTokenLogo(logo);
     setOpenFT(false);
+    console.log(index);
+    setDestTokenAddress(tokenAddressesDest[index].address);
   };
 
   return (
@@ -98,7 +132,7 @@ const Swapmodal = () => {
                         <div
                           className="px-4 py-3 flex rounded-xl hover:bg-slate-700 cursor-pointer bg-slate-800 duration-200"
                           onClick={() => setOpenOC(!openOC)}
-                        //   ref={buttonRef}
+                          //   ref={buttonRef}
                         >
                           <div className="h-6 w-6 2xl:h-9 2xl:w-9 text-white">
                             <Image
@@ -116,11 +150,11 @@ const Swapmodal = () => {
                             // ref={menuRef}
                             className="flex justify-center text-white flex-col absolute bg-gray-700 rounded-xl mt-1"
                           >
-                            {OriginChain.map((ochain, symbol) => {
+                            {OriginChain.map((ochain) => {
                               return (
                                 <li
                                   className="py-2 px-8 rounded-xl hover:bg-gray-800 cursor-pointer"
-                                  key={symbol}
+                                  key={index}
                                 >
                                   <div
                                     onClick={() =>
@@ -160,17 +194,18 @@ const Swapmodal = () => {
                         </div>
                         {openOT && (
                           <ul className="flex justify-center text-white flex-col absolute bg-gray-700 rounded-xl mt-1">
-                            {OriginTokens.map((otoken, symbol) => {
+                            {OriginTokens.map((otoken, index) => {
                               return (
                                 <li
                                   className="py-2 px-12 rounded-xl hover:bg-gray-800 cursor-pointer"
-                                  key={symbol}
+                                  key={index}
                                 >
                                   <div
                                     onClick={() =>
                                       selectOriginToken(
                                         otoken.name,
-                                        otoken.logo
+                                        otoken.logo,
+                                        index
                                       )
                                     }
                                     className="flex justify-start align-middle items-center mb-2"
@@ -269,15 +304,19 @@ const Swapmodal = () => {
                         </div>
                         {openFT && (
                           <ul className="flex justify-center text-white flex-col absolute bg-gray-700 rounded-xl mt-1 z-10">
-                            {FinalTokens.map((ftoken, symbol) => {
+                            {FinalTokens.map((ftoken, index) => {
                               return (
                                 <li
                                   className="py-2 px-12 rounded-xl hover:bg-gray-800 cursor-pointer"
-                                  key={symbol}
+                                  key={index}
                                 >
                                   <div
                                     onClick={() =>
-                                      selectFinalToken(ftoken.name, ftoken.logo)
+                                      selectFinalToken(
+                                        ftoken.name,
+                                        ftoken.logo,
+                                        index
+                                      )
                                     }
                                     className="flex justify-start align-middle items-center mb-2"
                                   >
@@ -338,9 +377,6 @@ const Swapmodal = () => {
                   </div>
                 </div>
               </TabPanel>
-
-
-
 
               <TabPanel color="white">
                 <div className="flex flex-col">
